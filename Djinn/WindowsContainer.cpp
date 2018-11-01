@@ -44,8 +44,8 @@ bool WindowsContainer::Initialize()
 
 bool WindowsContainer::InitializeWindow()
 {
-    const char* wndClassName = "DjinnRendererWindow";
-    const char* wndTitle = "Djinn Renderer";
+    auto wndClassName = L"DjinnRendererWindow";
+    auto wndTitle = L"Djinn Renderer";
 
     WNDCLASS wc;
     wc.style = CS_HREDRAW | CS_VREDRAW;
@@ -60,7 +60,7 @@ bool WindowsContainer::InitializeWindow()
     wc.lpszClassName = wndClassName;
 
     if (!RegisterClass(&wc)) {
-        MessageBox(0, "RegisterClass Failed.", 0, 0);
+        MessageBox(0, L"RegisterClass Failed.", 0, 0);
         return false;
     }
 
@@ -81,7 +81,7 @@ bool WindowsContainer::InitializeWindow()
         hInstance,
         0);
     if (!hWnd) {
-        MessageBox(0, "CreateWindow Failed.", 0, 0);
+        MessageBox(0, L"CreateWindow Failed.", 0, 0);
         return false;
     }
 

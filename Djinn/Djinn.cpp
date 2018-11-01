@@ -6,12 +6,16 @@
 #include "WindowsContainer.h"
 #include "Graphics.h"
 
+#include "Utilities.h"
+
 
 using namespace Djinn;
 
 #ifdef _WIN32
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cmdline, int cmdshow)
 {
+    Logger::Log(L"Welcome to the Djinn Renderer! V0.2");
+
     try {
         WindowsContainer container(hInstance);
         container.Initialize();
@@ -24,8 +28,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cmdline, 
             // Handle handle resize messages.
             graphics.Update();
         }
-    } catch (std::exception e) {
-        Logger::Log(e.what());
+    } catch (std::exception &e) {
+        Logger::Log(Utilities::ANSI2UNICODE(e.what()).c_str());
     }
 
     return 0;
@@ -33,6 +37,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cmdline, 
 #else
 int main()
 {
+    Logger::Log("Non-windows platforms not yet supported.");
     return 0;
 }
 #endif
