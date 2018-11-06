@@ -14,7 +14,7 @@ using namespace Djinn;
 #ifdef _WIN32
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cmdline, int cmdshow)
 {
-    Logger::Log(L"Welcome to the Djinn Renderer! V0.2");
+    Logger::Log(L"Djinn Renderer v0.2");
 
     try {
         WindowsContainer container(hInstance);

@@ -15,5 +15,13 @@ namespace Djinn
             MultiByteToWideChar(CP_ACP, 0, str, -1, buffer, buffer_size);
             return std::wstring(buffer);
         }
+
+        static std::string UNICODE2ANSI(const WCHAR* str)
+        {
+            const size_t buffer_size = 8192U;
+            char buffer[buffer_size];
+            WideCharToMultiByte(CP_ACP, 0, str, -1, buffer, buffer_size, 0, 0);
+            return std::string(buffer);
+        }
     };
 }

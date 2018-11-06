@@ -22,11 +22,21 @@ namespace Djinn
     private:
         Microsoft::WRL::ComPtr<IDXGIFactory4> dxgiFactory;
         Microsoft::WRL::ComPtr<ID3D12Device> device;
+        Microsoft::WRL::ComPtr<ID3D12Fence> fence;
+        Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue;
+        Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator;
+        Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList;
         DXGI_FORMAT backBufferFormat;
+        UINT msaaQualityLevels = 0;
         // Initialization.
         void InitDebugLayer();
         void CreateDxgiFactory();
         void CreateDevice();
+        void CreateFence();
+        void CheckMSAASupport();
+        void CreateCommandObjects();
+        void CreateSwapChain();
+        void CreateDescriptorHeaps();
         // Debug Logging.
         void LogAdapters();
         void LogAdapterOutputs(IDXGIAdapter& adapter);
@@ -38,14 +48,14 @@ namespace Djinn
     {
     public:
         GraphicsException() : GraphicsException("Unspecified cause.") {};
-        GraphicsException(char const* error) : error(error) {};
+        GraphicsException(char const* error) {
+            auto err = strcat_s(msg, 256, error);
+        };
         char const* what() const override
         {
-            char str[256] = "DirectX12 encountered an exception: ";
-            auto err = strcat_s(str, 256, error);
-            return str;
+            return msg;
         };
     private:
-        char const* error;
+        char msg[256] = "DirectX12 encountered an exception: ";
     };
 }

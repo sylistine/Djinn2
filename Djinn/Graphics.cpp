@@ -5,7 +5,7 @@ using namespace Microsoft::WRL;
 using namespace Djinn;
 
 
-Graphics::Graphics()
+Graphics::Graphics() : backBufferFormat(DXGI_FORMAT_R8G8B8A8_UNORM)
 {}
 
 
@@ -15,6 +15,8 @@ Graphics::~Graphics()
 
 void Graphics::Initialize()
 {
+    Logger::Log(L"Graphics backend: DirectX12");
+
 #if _DEBUG
     InitDebugLayer();
 #endif
@@ -25,6 +27,12 @@ void Graphics::Initialize()
 #if _DEBUG
     LogAdapters();
 #endif
+
+    CreateFence();
+
+    CheckMSAASupport();
+
+    CreateCommandObjects();
 }
 
 
@@ -65,11 +73,67 @@ inline void Graphics::CreateDevice()
 }
 
 
+inline void Graphics::CreateFence()
+{
+    auto result = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
+    if (FAILED(result)) throw GraphicsException("Unable to create fence");
+}
+
+
+inline void Graphics::CheckMSAASupport()
+{
+    D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS msQualityLevels;
+    msQualityLevels.Format = backBufferFormat;
+    msQualityLevels.SampleCount = 4;
+    msQualityLevels.Flags = D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE;
+    msQualityLevels.NumQualityLevels = 0;
+    auto result = device->CheckFeatureSupport(
+        D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS,
+        &msQualityLevels, sizeof msQualityLevels);
+    msaaQualityLevels = msQualityLevels.NumQualityLevels - 1;
+
+    Logger::Log(std::to_wstring(msaaQualityLevels));
+}
+
+
+inline void Graphics::CreateCommandObjects()
+{
+    auto commandListType = D3D12_COMMAND_LIST_TYPE_DIRECT;
+
+    D3D12_COMMAND_QUEUE_DESC queueDesc = {};
+    queueDesc.Type = commandListType;
+    queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+
+    auto result = device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue));
+    if (FAILED(result)) throw GraphicsException("Unable to create command queue.");
+
+    result = device->CreateCommandAllocator(commandListType, IID_PPV_ARGS(&commandAllocator));
+    if (FAILED(result)) throw GraphicsException("Unable to create command allocator.");
+
+    result = device->CreateCommandList(0, commandListType, commandAllocator.Get(), nullptr,
+        IID_PPV_ARGS(&commandList));
+    if (FAILED(result)) throw GraphicsException("Unable to create command list.");
+
+    commandList->Close();
+}
+
+
+inline void Graphics::CreateSwapChain()
+{
+
+}
+
+
+inline void Graphics::CreateDescriptorHeaps()
+{
+
+}
+
+
 void Graphics::LogAdapters()
 {
     UINT i = 0;
     IDXGIAdapter *current_adapter = nullptr;
-    std::vector<IDXGIAdapter*> adapters;
     while(dxgiFactory->EnumAdapters(i++, &current_adapter) != DXGI_ERROR_NOT_FOUND)
     {
         DXGI_ADAPTER_DESC desc;
@@ -77,15 +141,9 @@ void Graphics::LogAdapters()
         
         std::wstring text = L"Adapter: ";
         text += desc.Description;
-        text += L"\n";
-        Logger::Log(text.c_str());
+        Logger::Log(text);
 
-        adapters.push_back(current_adapter);
-    }
-
-    for (auto& adapter : adapters)
-    {
-        LogAdapterOutputs(*adapter);
+        LogAdapterOutputs(*current_adapter);
     }
 }
 
@@ -101,9 +159,8 @@ void Graphics::LogAdapterOutputs(IDXGIAdapter& adapter)
 
         std::wstring text = L"Output: ";
         text += desc.DeviceName;
-        text += L"\n";
 
-        Logger::Log(text.c_str());
+        Logger::Log(text);
 
         LogOutputDisplayModes(*current_output);
 
@@ -121,15 +178,17 @@ void Graphics::LogOutputDisplayModes(IDXGIOutput& output)
     auto modeList = new DXGI_MODE_DESC[count];
     output.GetDisplayModeList(backBufferFormat, flags, &count, modeList);
 
+    std::wstring text = L"";
     for (UINT i = 0; i < count; ++i)
     {
         UINT num = modeList[i].RefreshRate.Numerator;
         UINT den = modeList[i].RefreshRate.Denominator;
-        std::wstring text =
-            std::to_wstring(modeList[i].Width) + L"x" +
-            std::to_wstring(modeList[i].Height) + L"@" +
-            std::to_wstring(num) + L"/" + std::to_wstring(den) + L"hz\n";
-
-        Logger::Log(text.c_str());
+        text.append(std::to_wstring(modeList[i].Width) + L"x");
+        text.append(std::to_wstring(modeList[i].Height) + L" @ ");
+        text.append(std::to_wstring(num) + L"/" + std::to_wstring(den) + L"hz");
+        text.append(Logger::WNewLine());
     }
+    Logger::Log(text);
+
+    delete[] modeList;
 }
