@@ -1,6 +1,9 @@
 #include "Logger.h"
 
 
+using namespace Djinn;
+
+
 Logger::Logger()
 {
     auto filepath = "log.txt";
@@ -48,7 +51,7 @@ void Logger::Write(const wchar_t* msg)
         if (msg[i] == '\0') break;
         len++;
     }
-    fwrite(Djinn::Utilities::UNICODE2ANSI(msg).c_str(), len, 1, file);
+    fwrite(Utilities::UNICODE2ANSI(msg).c_str(), len, 1, file);
     fwrite(newline, newlinesize, 1, file);
     fwrite(newline, newlinesize, 1, file);
 }

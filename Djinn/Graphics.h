@@ -15,19 +15,25 @@ namespace Djinn
     class Graphics
     {
     public:
-        Graphics();
+        Graphics(HWND outputWindow);
         ~Graphics();
         void Initialize();
         void Update();
     private:
+        HWND outputWindow;
         Microsoft::WRL::ComPtr<IDXGIFactory4> dxgiFactory;
         Microsoft::WRL::ComPtr<ID3D12Device> device;
         Microsoft::WRL::ComPtr<ID3D12Fence> fence;
         Microsoft::WRL::ComPtr<ID3D12CommandQueue> commandQueue;
         Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator;
         Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList;
-        DXGI_FORMAT backBufferFormat;
+        Microsoft::WRL::ComPtr<IDXGISwapChain> swapChain;
+
+        std::vector<DXGI_MODE_DESC> modeDescs;
+
+        DXGI_FORMAT backBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
         UINT msaaQualityLevels = 0;
+        UINT swapChainBufferCount = 2;
         // Initialization.
         void InitDebugLayer();
         void CreateDxgiFactory();
@@ -37,7 +43,9 @@ namespace Djinn
         void CreateCommandObjects();
         void CreateSwapChain();
         void CreateDescriptorHeaps();
-        // Debug Logging.
+
+        // Display mode enumerations.
+        void GetDisplayModes();
         void LogAdapters();
         void LogAdapterOutputs(IDXGIAdapter& adapter);
         void LogOutputDisplayModes(IDXGIOutput& output);

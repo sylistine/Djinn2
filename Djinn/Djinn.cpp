@@ -20,7 +20,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cmdline, 
         WindowsContainer container(hInstance);
         container.Initialize();
 
-        Graphics graphics;
+        Graphics graphics(container.GetWindowHandler());
         graphics.Initialize();
 
         while (!container.IsApplicationQuitting()) {

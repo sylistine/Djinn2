@@ -5,6 +5,7 @@
 #include <Windows.h>
 #include <WindowsX.h>
 
+#include "Djinn.h"
 #include "Timer.h"
 
 namespace Djinn
@@ -23,6 +24,7 @@ namespace Djinn
         int Update();
         LRESULT WndProc(HWND, UINT, WPARAM, LPARAM);
         bool IsApplicationQuitting() const { return isApplicationQuitting; };
+        HWND GetWindowHandler() const { return hWnd; };
     private:
         // Windows parameters.
         HINSTANCE hInstance;

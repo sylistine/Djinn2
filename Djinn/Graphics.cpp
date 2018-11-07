@@ -5,7 +5,7 @@ using namespace Microsoft::WRL;
 using namespace Djinn;
 
 
-Graphics::Graphics() : backBufferFormat(DXGI_FORMAT_R8G8B8A8_UNORM)
+Graphics::Graphics(HWND outputWindow) : outputWindow(outputWindow)
 {}
 
 
@@ -15,7 +15,7 @@ Graphics::~Graphics()
 
 void Graphics::Initialize()
 {
-    Logger::Log(L"Graphics backend: DirectX12");
+    Logger::Log(L"Graphics: DirectX12");
 
 #if _DEBUG
     InitDebugLayer();
@@ -24,14 +24,14 @@ void Graphics::Initialize()
     CreateDxgiFactory();
     CreateDevice();
 
+    
+
 #if _DEBUG
     LogAdapters();
 #endif
 
     CreateFence();
-
     CheckMSAASupport();
-
     CreateCommandObjects();
 }
 
@@ -120,13 +120,43 @@ inline void Graphics::CreateCommandObjects()
 
 inline void Graphics::CreateSwapChain()
 {
+    DXGI_SAMPLE_DESC sampleDesc;
+    sampleDesc.Count = 4;
+    sampleDesc.Quality = msaaQualityLevels;
 
+    DXGI_MODE_DESC modeDesc;
+    modeDesc.Width;
+    modeDesc.Height;
+    modeDesc.RefreshRate.Numerator;
+    modeDesc.RefreshRate.Denominator;
+    modeDesc.Format = backBufferFormat;
+    modeDesc.ScanlineOrdering;
+    modeDesc.Scaling;
+
+    DXGI_SWAP_CHAIN_DESC swapChainDesc;
+    swapChainDesc.BufferDesc = modeDesc;
+    swapChainDesc.SampleDesc = sampleDesc;
+    swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    swapChainDesc.BufferCount = swapChainBufferCount;
+    swapChainDesc.OutputWindow = outputWindow;
+    swapChainDesc.Windowed = false;
+    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+    swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+
+    swapChainDesc.SampleDesc = sampleDesc;
+
+    dxgiFactory->CreateSwapChain(device.Get(), &swapChainDesc, swapChain.GetAddressOf());
 }
 
 
 inline void Graphics::CreateDescriptorHeaps()
 {
 
+}
+
+
+void Graphics::GetDisplayModes()
+{
 }
 
 

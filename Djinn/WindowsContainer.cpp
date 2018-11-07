@@ -29,6 +29,8 @@ WindowsContainer *WindowsContainer::GetApp()
 
 bool WindowsContainer::Initialize()
 {
+    Logger::Log(L"Platform: Win32");
+
     if (!initialized) {
         if (!InitializeWindow()) {
             return false;
