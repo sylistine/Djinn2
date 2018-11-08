@@ -5,7 +5,7 @@ using namespace Microsoft::WRL;
 using namespace Djinn;
 
 
-Graphics::Graphics(HWND outputWindow) : outputWindow(outputWindow)
+Graphics::Graphics(HWND wnd, int width, int height) : outputWindow(wnd), width(width), height(height)
 {}
 
 
@@ -39,6 +39,13 @@ void Graphics::Initialize()
 void Graphics::Update()
 {
 
+}
+
+
+void Graphics::GetWindowSize(int& width, int& height)
+{
+    width = preferredOutputMode.Width;
+    height = preferredOutputMode.Height;
 }
 
 
@@ -101,9 +108,9 @@ void Graphics::UpdateAdapterInfo()
                     }
                     else {
                         auto& newRefresh = modeList[k].RefreshRate;
-                        float newRate = newRefresh.Numerator / newRefresh.Denominator;
+                        double newRate = newRefresh.Numerator / newRefresh.Denominator;
                         auto& oldRefresh = preferredOutputMode.RefreshRate;
-                        float oldRate = oldRefresh.Numerator / oldRefresh.Denominator;
+                        double oldRate = oldRefresh.Numerator / oldRefresh.Denominator;
                         if (newRate > oldRate) {
                             preferredOutputMode = modeList[k];
                         }
@@ -181,8 +188,17 @@ inline void Graphics::CreateSwapChain()
     sampleDesc.Count = 4;
     sampleDesc.Quality = msaaQualityLevels;
 
+    DXGI_MODE_DESC bufferDesc;
+    bufferDesc.Width = width;
+    bufferDesc.Height = height;
+    bufferDesc.RefreshRate.Numerator = 60;
+    bufferDesc.RefreshRate.Denominator = 1;
+    bufferDesc.Format = backBufferFormat;
+    bufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+    bufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+
     DXGI_SWAP_CHAIN_DESC swapChainDesc;
-    swapChainDesc.BufferDesc = preferredOutputMode;
+    swapChainDesc.BufferDesc = bufferDesc;
     swapChainDesc.SampleDesc = sampleDesc;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.BufferCount = swapChainBufferCount;
@@ -190,8 +206,6 @@ inline void Graphics::CreateSwapChain()
     swapChainDesc.Windowed = false;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-
-    swapChainDesc.SampleDesc = sampleDesc;
 
     dxgiFactory->CreateSwapChain(device.Get(), &swapChainDesc, swapChain.GetAddressOf());
 }

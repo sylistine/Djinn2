@@ -26,13 +26,16 @@ namespace Djinn
     class Graphics
     {
     public:
-        Graphics(HWND outputWindow);
+        Graphics(HWND outputWindow, int width, int height);
         ~Graphics();
         void Initialize();
         void Update();
+        void GetWindowSize(int& width, int& height);
     private:
         Graphics(const Graphics& other) {}
         HWND outputWindow;
+        int width;
+        int height;
         Microsoft::WRL::ComPtr<IDXGIFactory4> dxgiFactory;
         Microsoft::WRL::ComPtr<ID3D12Device> device;
         Microsoft::WRL::ComPtr<ID3D12Fence> fence;

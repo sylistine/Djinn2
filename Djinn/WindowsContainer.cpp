@@ -154,8 +154,8 @@ LRESULT WindowsContainer::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPa
         }
         return 0;
     case WM_SIZE:
-        windowWidth = LOWORD(lParam);
-        windowHeight = HIWORD(lParam);
+        //windowWidth = LOWORD(lParam);
+        //windowHeight = HIWORD(lParam);
         if (wParam == SIZE_MINIMIZED) {
             paused = true;
             minimized = true;

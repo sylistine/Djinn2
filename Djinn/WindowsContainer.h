@@ -25,7 +25,10 @@ namespace Djinn
         LRESULT WndProc(HWND, UINT, WPARAM, LPARAM);
         bool IsApplicationQuitting() const { return isApplicationQuitting; };
         HWND GetWindowHandler() const { return hWnd; };
+        int GetWindowWidth() { return windowWidth; };
+        int GetWindowHeight() { return windowHeight; };
     private:
+        void(*OnWindowSizeChanged)(int width, int height);
         // Windows parameters.
         HINSTANCE hInstance;
         HWND hWnd;
