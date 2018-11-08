@@ -8,7 +8,7 @@ LRESULT WINAPI MainWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 }
 
 
-WindowsContainer::WindowsContainer(HINSTANCE hInstance)
+WindowsContainer::WindowsContainer(HINSTANCE hInstance) : hInstance(hInstance)
 {
     assert(windowsApp == nullptr);
     windowsApp = this;
@@ -30,6 +30,8 @@ WindowsContainer *WindowsContainer::GetApp()
 bool WindowsContainer::Initialize()
 {
     Logger::Log(L"Platform: Win32");
+
+    
 
     if (!initialized) {
         if (!InitializeWindow()) {

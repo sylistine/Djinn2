@@ -3,6 +3,7 @@
 #include <wrl.h>
 #include <memory>
 #include <vector>
+#include <array>
 
 #include <dxgi1_4.h>
 #include <d3d12.h>
@@ -11,7 +12,17 @@
 #include "Logger.h"
 
 namespace Djinn
-{
+{   
+    typedef struct OutputInfo {
+        DXGI_OUTPUT_DESC desc;
+        std::vector<DXGI_MODE_DESC> modeDescs;
+    } OutputInfo;
+
+    typedef struct AdapterInfo {
+        DXGI_ADAPTER_DESC desc;
+        std::vector<OutputInfo> outputs;
+    } AdapterInfo;
+
     class Graphics
     {
     public:
@@ -20,6 +31,7 @@ namespace Djinn
         void Initialize();
         void Update();
     private:
+        Graphics(const Graphics& other) {}
         HWND outputWindow;
         Microsoft::WRL::ComPtr<IDXGIFactory4> dxgiFactory;
         Microsoft::WRL::ComPtr<ID3D12Device> device;
@@ -29,26 +41,25 @@ namespace Djinn
         Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList;
         Microsoft::WRL::ComPtr<IDXGISwapChain> swapChain;
 
-        std::vector<DXGI_MODE_DESC> modeDescs;
+        std::vector<AdapterInfo> adapterInfo;
+        DXGI_MODE_DESC preferredOutputMode;
 
         DXGI_FORMAT backBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
         UINT msaaQualityLevels = 0;
         UINT swapChainBufferCount = 2;
+
         // Initialization.
         void InitDebugLayer();
         void CreateDxgiFactory();
         void CreateDevice();
+        void UpdateAdapterInfo();
         void CreateFence();
         void CheckMSAASupport();
         void CreateCommandObjects();
         void CreateSwapChain();
         void CreateDescriptorHeaps();
 
-        // Display mode enumerations.
-        void GetDisplayModes();
         void LogAdapters();
-        void LogAdapterOutputs(IDXGIAdapter& adapter);
-        void LogOutputDisplayModes(IDXGIOutput& output);
     };
 
 

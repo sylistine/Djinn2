@@ -24,7 +24,7 @@ void Graphics::Initialize()
     CreateDxgiFactory();
     CreateDevice();
 
-    
+    UpdateAdapterInfo();
 
 #if _DEBUG
     LogAdapters();
@@ -69,6 +69,63 @@ inline void Graphics::CreateDevice()
 
         result = D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device));
         if (FAILED(result)) throw GraphicsException("Unable to create any device.");
+    }
+}
+
+
+void Graphics::UpdateAdapterInfo()
+{
+    UINT i = 0;
+    IDXGIAdapter *current_adapter = nullptr;
+    while (dxgiFactory->EnumAdapters(i++, &current_adapter) != DXGI_ERROR_NOT_FOUND)
+    {
+        AdapterInfo newAdapter;
+        current_adapter->GetDesc(&newAdapter.desc);
+
+        UINT j = 0;
+        IDXGIOutput* current_output = nullptr;
+        while (current_adapter->EnumOutputs(j++, &current_output) != DXGI_ERROR_NOT_FOUND)
+        {
+            UINT modeCount = 0;
+            current_output->GetDisplayModeList(backBufferFormat, 0, &modeCount, nullptr);
+            auto modeList = new DXGI_MODE_DESC[modeCount];
+            current_output->GetDisplayModeList(backBufferFormat, 0, &modeCount, modeList);
+
+            OutputInfo newOutput;
+            current_output->GetDesc(&newOutput.desc);
+            for (auto k = 0; k < modeCount; ++k)
+            {
+                if (modeList[k].Width == 1920U && modeList[k].Height == 1080U) {
+                    if (preferredOutputMode.RefreshRate.Denominator == 0) {
+                        preferredOutputMode = modeList[k];
+                    }
+                    else {
+                        auto& newRefresh = modeList[k].RefreshRate;
+                        float newRate = newRefresh.Numerator / newRefresh.Denominator;
+                        auto& oldRefresh = preferredOutputMode.RefreshRate;
+                        float oldRate = oldRefresh.Numerator / oldRefresh.Denominator;
+                        if (newRate > oldRate) {
+                            preferredOutputMode = modeList[k];
+                        }
+                    }
+                }
+                newOutput.modeDescs.push_back(modeList[k]);
+            }
+            newAdapter.outputs.push_back(newOutput);
+            current_output->Release();
+            current_output = nullptr;
+        }
+        adapterInfo.push_back(newAdapter);
+        current_adapter->Release();
+        current_adapter = nullptr;
+    }
+
+    if (preferredOutputMode.RefreshRate.Numerator == 0) {
+        throw GraphicsException("No supported output modes detected.");
+    } else {
+        Logger::Log(std::wstring(L"Preferred output mode found. ")
+            + std::to_wstring(preferredOutputMode.Width) + L"x"
+            + std::to_wstring(preferredOutputMode.Height));
     }
 }
 
@@ -124,17 +181,8 @@ inline void Graphics::CreateSwapChain()
     sampleDesc.Count = 4;
     sampleDesc.Quality = msaaQualityLevels;
 
-    DXGI_MODE_DESC modeDesc;
-    modeDesc.Width;
-    modeDesc.Height;
-    modeDesc.RefreshRate.Numerator;
-    modeDesc.RefreshRate.Denominator;
-    modeDesc.Format = backBufferFormat;
-    modeDesc.ScanlineOrdering;
-    modeDesc.Scaling;
-
     DXGI_SWAP_CHAIN_DESC swapChainDesc;
-    swapChainDesc.BufferDesc = modeDesc;
+    swapChainDesc.BufferDesc = preferredOutputMode;
     swapChainDesc.SampleDesc = sampleDesc;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.BufferCount = swapChainBufferCount;
@@ -155,70 +203,27 @@ inline void Graphics::CreateDescriptorHeaps()
 }
 
 
-void Graphics::GetDisplayModes()
-{
-}
-
-
 void Graphics::LogAdapters()
 {
-    UINT i = 0;
-    IDXGIAdapter *current_adapter = nullptr;
-    while(dxgiFactory->EnumAdapters(i++, &current_adapter) != DXGI_ERROR_NOT_FOUND)
-    {
-        DXGI_ADAPTER_DESC desc;
-        current_adapter->GetDesc(&desc);
-        
-        std::wstring text = L"Adapter: ";
-        text += desc.Description;
-        Logger::Log(text);
+    std::wstring log = L"";
 
-        LogAdapterOutputs(*current_adapter);
+    for (auto& adapter : adapterInfo) {
+        log += adapter.desc.Description;
+        log += Logger::WNewLine();
+        for (auto& output : adapter.outputs) {
+            log += output.desc.DeviceName;
+            log += Logger::WNewLine();
+            for (auto& mode : output.modeDescs) {
+                log += std::to_wstring(mode.Width);
+                log += L"x";
+                log += std::to_wstring(mode.Height);
+                log += L" @ ";
+                log += std::to_wstring(mode.RefreshRate.Numerator)
+                    + L"/"
+                    + std::to_wstring(mode.RefreshRate.Denominator);
+                log += Logger::WNewLine();
+            }
+        }
     }
-}
-
-
-void Graphics::LogAdapterOutputs(IDXGIAdapter& adapter)
-{
-    UINT i = 0;
-    IDXGIOutput* current_output = nullptr;
-    while (adapter.EnumOutputs(i++, &current_output) != DXGI_ERROR_NOT_FOUND)
-    {
-        DXGI_OUTPUT_DESC desc;
-        current_output->GetDesc(&desc);
-
-        std::wstring text = L"Output: ";
-        text += desc.DeviceName;
-
-        Logger::Log(text);
-
-        LogOutputDisplayModes(*current_output);
-
-        current_output->Release();
-        current_output = nullptr;
-    }
-}
-
-
-void Graphics::LogOutputDisplayModes(IDXGIOutput& output)
-{
-    UINT flags = 0;
-    UINT count = 0;
-    output.GetDisplayModeList(backBufferFormat, flags, &count, nullptr);
-    auto modeList = new DXGI_MODE_DESC[count];
-    output.GetDisplayModeList(backBufferFormat, flags, &count, modeList);
-
-    std::wstring text = L"";
-    for (UINT i = 0; i < count; ++i)
-    {
-        UINT num = modeList[i].RefreshRate.Numerator;
-        UINT den = modeList[i].RefreshRate.Denominator;
-        text.append(std::to_wstring(modeList[i].Width) + L"x");
-        text.append(std::to_wstring(modeList[i].Height) + L" @ ");
-        text.append(std::to_wstring(num) + L"/" + std::to_wstring(den) + L"hz");
-        text.append(Logger::WNewLine());
-    }
-    Logger::Log(text);
-
-    delete[] modeList;
+    Logger::Log(log);
 }
