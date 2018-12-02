@@ -14,12 +14,12 @@ Timer Timer::s_timer;
 
 Timer::Timer() :
     secondsPerCount(0.0),
-    deltaTime(-1.0),
-    baseTime(0),
-    stopTime(0),
-    pausedTime(0),
-    prevTime(0),
-    currTime(0),
+    _deltaTime(-1.0),
+    _baseTime(0),
+    _stopTime(0),
+    _pausedTime(0),
+    _prevTime(0),
+    _currTime(0),
     stopped(false)
 {
     __int64 countsPerSec;
@@ -41,7 +41,7 @@ float Timer::TotalTime()const
     //  baseTime       stopTime        startTime     stopTime    currTime
 
     if (stopped) {
-        return static_cast<float>(((stopTime - pausedTime) - baseTime) * secondsPerCount);
+        return static_cast<float>(((_stopTime - _pausedTime) - _baseTime) * secondsPerCount);
     }
 
     // The distance currTime - baseTime includes paused time,
@@ -55,13 +55,13 @@ float Timer::TotalTime()const
     //  baseTime       stopTime        startTime     currTime
 
     else {
-        return static_cast<float>(((currTime - pausedTime) - baseTime) * secondsPerCount);
+        return static_cast<float>(((_currTime - _pausedTime) - _baseTime) * secondsPerCount);
     }
 }
 
 float Timer::DeltaTime()const
 {
-    return static_cast<float>(deltaTime);
+    return static_cast<float>(_deltaTime);
 }
 
 void Timer::Reset()
@@ -69,9 +69,9 @@ void Timer::Reset()
     __int64 currTime;
     QueryPerformanceCounter(reinterpret_cast<LARGE_INTEGER*>(&currTime));
 
-    baseTime = currTime;
-    prevTime = currTime;
-    stopTime = 0;
+    _baseTime = currTime;
+    _prevTime = currTime;
+    _stopTime = 0;
     stopped = false;
 }
 
@@ -88,47 +88,45 @@ void Timer::Start()
     //  baseTime       stopTime        startTime     
 
     if (stopped) {
-        pausedTime += (startTime - stopTime);
+        _pausedTime += (startTime - _stopTime);
 
-        prevTime = startTime;
-        stopTime = 0;
+        _prevTime = startTime;
+        _stopTime = 0;
         stopped = false;
     }
 }
 
 void Timer::Stop()
 {
-    if (!stopped) {
-        __int64 currTime;
-        QueryPerformanceCounter(reinterpret_cast<LARGE_INTEGER*>(&currTime));
+    if (stopped) return;
 
-        stopTime = currTime;
-        stopped = true;
-    }
+    __int64 currTime;
+    QueryPerformanceCounter(reinterpret_cast<LARGE_INTEGER*>(&currTime));
+
+    _stopTime = currTime;
+    stopped = true;
 }
 
 void Timer::Tick()
 {
     if (stopped) {
-        deltaTime = 0.0;
+        _deltaTime = 0.0;
         return;
     }
 
-    __int64 currTime;
-    QueryPerformanceCounter(reinterpret_cast<LARGE_INTEGER*>(&currTime));
-    currTime = currTime;
+    QueryPerformanceCounter(reinterpret_cast<LARGE_INTEGER*>(&_currTime));
 
     // Time difference between this frame and the previous.
-    deltaTime = (currTime - prevTime)*secondsPerCount;
+    _deltaTime = (_currTime - _prevTime)*secondsPerCount;
 
     // Prepare for next frame.
-    prevTime = currTime;
+    _prevTime = _currTime;
 
     // Force nonnegative.  The DXSDK's CDXUTTimer mentions that if the 
     // processor goes into a power save mode or we get shuffled to another
     // processor, then deltaTime can be negative.
-    if (deltaTime < 0.0) {
-        deltaTime = 0.0;
+    if (_deltaTime < 0.0) {
+        _deltaTime = 0.0;
     }
 }
 

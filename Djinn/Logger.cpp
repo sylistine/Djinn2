@@ -17,34 +17,35 @@ Logger::~Logger()
 }
 
 
-Logger Logger::logger = Logger();
+Logger Logger::instance = Logger();
+
+
+void Logger::Write(std::wstring msg)
+{
+    Write(msg.c_str());
+}
 
 
 /// Static Log that calls instance Write.
-void Logger::Log(const wchar_t* msg)
+void Logger::Write(const wchar_t* msg)
 {
-    logger.Write(msg);
+    instance.Write_Internal(msg);
 }
 
-
-void Logger::Log(std::wstring msg)
-{
-    Log(msg.c_str());
-}
 
 const char* Logger::NewLine()
 {
-    return logger.newline;
+    return instance.newline;
 }
 
 
 const wchar_t* Logger::WNewLine()
 {
-    return logger.wnewline;
+    return instance.wnewline;
 }
 
 
-void Logger::Write(const wchar_t* msg)
+void Logger::Write_Internal(const wchar_t* msg)
 {
     auto len = 0;
     for (auto i = 0; i < 8192; ++i) {

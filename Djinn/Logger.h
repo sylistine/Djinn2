@@ -11,12 +11,12 @@ namespace Djinn
     class Logger
     {
     public:
-        static void Log(const wchar_t* msg);
-        static void Log(const std::wstring msg);
+        static void Write(const wchar_t* msg);
+        static void Write(const std::wstring msg);
         static const char* NewLine();
         static const wchar_t* WNewLine();
     private:
-        static Logger logger;
+        static Logger instance;
 #ifdef _WIN32
         const char* newline = "\r\n";
         const wchar_t* wnewline = L"\r\n";
@@ -30,6 +30,6 @@ namespace Djinn
         Logger();
         ~Logger();
         FILE* file;
-        void Write(const wchar_t* msg);
+        void Write_Internal(const wchar_t* msg);
     };
 }

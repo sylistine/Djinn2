@@ -29,7 +29,7 @@ WindowsContainer *WindowsContainer::GetApp()
 
 bool WindowsContainer::Initialize()
 {
-    Logger::Log(L"Platform: Win32");
+    Logger::Write(L"Platform: Win32");
 
     
 

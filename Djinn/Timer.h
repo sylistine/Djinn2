@@ -22,12 +22,12 @@ public:
 private:
     Timer();
     double secondsPerCount;
-    double deltaTime;
-    __int64 baseTime;
-    __int64 stopTime;
-    __int64 pausedTime;
-    __int64 prevTime;
-    __int64 currTime;
+    double _deltaTime;
+    __int64 _baseTime;
+    __int64 _stopTime;
+    __int64 _pausedTime;
+    __int64 _prevTime;
+    __int64 _currTime;
     float fps;
     float mspf;
     bool stopped;
