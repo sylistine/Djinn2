@@ -1,4 +1,5 @@
 #include "DepthStencilResource.h"
+#include "Logger.h"
 
 using namespace Djinn::Graphics;
 using namespace Microsoft::WRL;
@@ -27,6 +28,14 @@ void DepthStencilResource::Create(UINT64 width, UINT64 height)
 {
     if (!initialized) throw GfxException(0, "Depth Stencil Texture Not Initialized.");
 
+    D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS multisampleQualityLevelsData = {
+    depthStencilFormat, 1, D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE, 0};
+    device->CheckFeatureSupport(
+        D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS,
+        &multisampleQualityLevelsData,
+        sizeof multisampleQualityLevelsData);
+    Logger::Write(std::to_wstring(multisampleQualityLevelsData.NumQualityLevels));
+
     D3D12_HEAP_PROPERTIES heapProperties;
     heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
     heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -43,7 +52,7 @@ void DepthStencilResource::Create(UINT64 width, UINT64 height)
     resourceDesc.MipLevels = 1;
     resourceDesc.Format = DXGI_FORMAT_R24G8_TYPELESS;
     resourceDesc.SampleDesc.Count = 1;
-    resourceDesc.SampleDesc.Quality = 0;
+    resourceDesc.SampleDesc.Quality = multisampleQualityLevelsData.NumQualityLevels - 1;
     resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 

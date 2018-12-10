@@ -2,17 +2,7 @@ Djinn Renderer v0.2
 
 Platform: Win32
 
-Graphics: DirectX12
+Initializing DirectX12.
 
-Preferred output mode found. 1920x1080
-
-Adapter: Intel(R) UHD Graphics 630
-Output: \\.\DISPLAY1
-Adapter: NVIDIA GeForce GTX 1070 with Max-Q Design
-Adapter: Microsoft Basic Render Driver
-
-
-4x MSAA quality levels: 0
-
-DirectX12 encountered an exception: Unable to create Depth Stencil Resource. Error code: E_INVALIDARG
+DirectX12 encountered an exception: Failed to initialize debug layer Error code: DXGI_ERROR_SDK_COMPONENT_MISSING
 

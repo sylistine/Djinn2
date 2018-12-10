@@ -6,8 +6,9 @@ using namespace Microsoft::WRL;
 using namespace Djinn::Graphics;
 
 
-Gfx::Gfx() {
-    Logger::Write(L"Graphics: DirectX12");
+Gfx::Gfx()
+{
+    Logger::Write(L"Initializing DirectX12.");
 
 #if _DEBUG
     InitDebugLayer();
@@ -15,8 +16,6 @@ Gfx::Gfx() {
 
     CreateDxgiFactory();
     CreateDevice();
-
-    depthStencilTexture.Init(device, dsvHeap);
 }
 
 
@@ -28,8 +27,8 @@ Gfx::~Gfx()
 void Gfx::Initialize(HWND wnd, int width, int height)
 {
     outputWindow = wnd;
-    width = width;
-    height = height;
+    this->width = width;
+    this->height = height;
 
     UpdateAdapterInfo();
 #if _DEBUG
@@ -44,6 +43,7 @@ void Gfx::Initialize(HWND wnd, int width, int height)
 
     CreateDescriptorHeaps();
 
+    depthStencilTexture.Init(device, dsvHeap);
     OnResize();
 }
 
@@ -72,6 +72,7 @@ inline void Gfx::InitDebugLayer()
 
 inline void Gfx::CreateDxgiFactory()
 {
+    Logger::Write(L"Creating dxgi factory.");
     auto result = CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory));
     if (FAILED(result)) throw GfxException(result, "Failed to create DXGIFactory");
 }
@@ -79,6 +80,7 @@ inline void Gfx::CreateDxgiFactory()
 
 inline void Gfx::CreateDevice()
 {
+    Logger::Write(L"Creating device.");
     auto result = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device));
     if (FAILED(result))
     {
