@@ -1,22 +1,12 @@
-#include "Graphics.h"
+#include "Gfx.h"
 
 
 using namespace std;
 using namespace Microsoft::WRL;
-using namespace Djinn;
+using namespace Djinn::Graphics;
 
 
-
-Graphics::~Graphics()
-{}
-
-
-void Graphics::Initialize(HWND wnd, int width, int height)
-{
-    outputWindow = wnd;
-    width = width;
-    height = height;
-
+Gfx::Gfx() {
     Logger::Write(L"Graphics: DirectX12");
 
 #if _DEBUG
@@ -26,8 +16,22 @@ void Graphics::Initialize(HWND wnd, int width, int height)
     CreateDxgiFactory();
     CreateDevice();
 
-    UpdateAdapterInfo();
+    depthStencilTexture.Init(device, dsvHeap);
+}
 
+
+Gfx::~Gfx()
+{
+}
+
+
+void Gfx::Initialize(HWND wnd, int width, int height)
+{
+    outputWindow = wnd;
+    width = width;
+    height = height;
+
+    UpdateAdapterInfo();
 #if _DEBUG
     LogAdapters();
 #endif
@@ -44,51 +48,51 @@ void Graphics::Initialize(HWND wnd, int width, int height)
 }
 
 
-void Graphics::Update()
+void Gfx::Update()
 {
 
 }
 
 
-void Graphics::GetWindowSize(int& width, int& height)
+void Gfx::GetWindowSize(int& width, int& height)
 {
     width = preferredOutputMode.Width;
     height = preferredOutputMode.Height;
 }
 
 
-inline void Graphics::InitDebugLayer()
+inline void Gfx::InitDebugLayer()
 {
     ComPtr<ID3D12Debug> debugController;
     auto result = D3D12GetDebugInterface(IID_PPV_ARGS(&debugController));
-    if (FAILED(result)) throw GraphicsException(result, "Failed to initialize debug layer");
+    if (FAILED(result)) throw GfxException(result, "Failed to initialize debug layer");
     debugController->EnableDebugLayer();
 }
 
 
-inline void Graphics::CreateDxgiFactory()
+inline void Gfx::CreateDxgiFactory()
 {
     auto result = CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory));
-    if (FAILED(result)) throw GraphicsException(result, "Failed to create DXGIFactory");
+    if (FAILED(result)) throw GfxException(result, "Failed to create DXGIFactory");
 }
 
 
-inline void Graphics::CreateDevice()
+inline void Gfx::CreateDevice()
 {
     auto result = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device));
     if (FAILED(result))
     {
         ComPtr<IDXGIAdapter> warpAdapter;
         result = dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter));
-        if (FAILED(result)) throw GraphicsException(result, "Failed to create default device and warp adapter.");
+        if (FAILED(result)) throw GfxException(result, "Failed to create default device and warp adapter.");
 
         result = D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device));
-        if (FAILED(result)) throw GraphicsException(result, "Unable to create any device.");
+        if (FAILED(result)) throw GfxException(result, "Unable to create any device.");
     }
 }
 
 
-void Graphics::UpdateAdapterInfo()
+void Gfx::UpdateAdapterInfo()
 {
     UINT i = 0;
     IDXGIAdapter *current_adapter = nullptr;
@@ -136,7 +140,7 @@ void Graphics::UpdateAdapterInfo()
     }
 
     if (preferredOutputMode.RefreshRate.Numerator == 0) {
-        throw GraphicsException(0, "No supported output modes detected.");
+        throw GfxException(0, "No supported output modes detected.");
     } else {
         Logger::Write(wstring(L"Preferred output mode found. ")
             + to_wstring(preferredOutputMode.Width) + L"x"
@@ -145,14 +149,14 @@ void Graphics::UpdateAdapterInfo()
 }
 
 
-inline void Graphics::CreateFence()
+inline void Gfx::CreateFence()
 {
     auto result = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
-    if (FAILED(result)) throw GraphicsException(result, "Unable to create fence");
+    if (FAILED(result)) throw GfxException(result, "Unable to create fence");
 }
 
 
-inline void Graphics::CheckMSAASupport()
+inline void Gfx::CheckMSAASupport()
 {
     D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS msQualityLevels;
     msQualityLevels.Format = backBufferFormat;
@@ -168,7 +172,7 @@ inline void Graphics::CheckMSAASupport()
 }
 
 
-inline void Graphics::CreateCommandObjects()
+inline void Gfx::CreateCommandObjects()
 {
     auto commandListType = D3D12_COMMAND_LIST_TYPE_DIRECT;
 
@@ -177,20 +181,26 @@ inline void Graphics::CreateCommandObjects()
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 
     auto result = device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue));
-    if (FAILED(result)) throw GraphicsException(result, "Unable to create command queue.");
+    if (FAILED(result)) throw GfxException(result, "Unable to create command queue.");
 
-    result = device->CreateCommandAllocator(commandListType, IID_PPV_ARGS(&commandAllocator));
-    if (FAILED(result)) throw GraphicsException(result, "Unable to create command allocator.");
+    result = device->CreateCommandAllocator(
+        commandListType,
+        IID_PPV_ARGS(commandAllocator.GetAddressOf()));
+    if (FAILED(result)) throw GfxException(result, "Unable to create command allocator.");
 
-    result = device->CreateCommandList(0, commandListType, commandAllocator.Get(), nullptr,
-        IID_PPV_ARGS(&commandList));
-    if (FAILED(result)) throw GraphicsException(result, "Unable to create command list.");
+    result = device->CreateCommandList(
+        0,
+        commandListType,
+        commandAllocator.Get(),
+        nullptr,
+        IID_PPV_ARGS(commandList.GetAddressOf()));
+    if (FAILED(result)) throw GfxException(result, "Unable to create command list.");
 
     commandList->Close();
 }
 
 
-inline void Graphics::CreateSwapChain()
+inline void Gfx::CreateSwapChain()
 {
     swapChain.Reset();
 
@@ -228,7 +238,7 @@ inline void Graphics::CreateSwapChain()
 
     if (FAILED(result))
     {
-        throw GraphicsException(result, (
+        throw GfxException(result, (
             string("Unable to create swap chain. ") +
             to_string(result)
             ).c_str());
@@ -236,7 +246,7 @@ inline void Graphics::CreateSwapChain()
 }
 
 
-inline void Graphics::CreateDescriptorHeaps()
+inline void Gfx::CreateDescriptorHeaps()
 {
     // RTV STUFF
     rtvDescSize = device->GetDescriptorHandleIncrementSize(
@@ -246,7 +256,9 @@ inline void Graphics::CreateDescriptorHeaps()
     rtvHeapDesc.NumDescriptors = swapChainBufferCount;
     rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
     rtvHeapDesc.NodeMask = 0;
-    device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&rtvHeap));
+    device->CreateDescriptorHeap(
+        &rtvHeapDesc,
+        IID_PPV_ARGS(rtvHeap.GetAddressOf()));
 
     // DSV STUFF
     dsvDescSize = device->GetDescriptorHandleIncrementSize(
@@ -256,19 +268,22 @@ inline void Graphics::CreateDescriptorHeaps()
     dsvHeapDesc.NumDescriptors = 1;
     dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
     dsvHeapDesc.NodeMask = 0;
-    device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsvHeap));
+    device->CreateDescriptorHeap(
+        &dsvHeapDesc,
+        IID_PPV_ARGS(dsvHeap.GetAddressOf()));
 
     cbvSrvUavDescSize = device->GetDescriptorHandleIncrementSize(
         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
 
-void Graphics::OnResize()
+void Gfx::OnResize()
 {
-    // Command objects reset.
     FlushCommandQueue();
+
+    // Command objects reset.
     auto result = commandList->Reset(commandAllocator.Get(), nullptr);
-    if (FAILED(result)) throw GraphicsException(result, "Unable to reset command list.");
+    if (FAILED(result)) throw GfxException(result, "Unable to reset command list.");
 
     // Final render resource reset.
     for (auto& buffer : swapChainBuffer) {
@@ -281,7 +296,7 @@ void Graphics::OnResize()
         width, height,
         backBufferFormat,
         DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH);
-    if (FAILED(result)) throw GraphicsException(result, "Unable to resize swap chain buffers.");
+    if (FAILED(result)) throw GfxException(result, "Unable to resize swap chain buffers.");
 
     currentBackBuffer = 0;
 
@@ -289,7 +304,7 @@ void Graphics::OnResize()
     for (auto i = 0U; i < swapChainBufferCount; ++i) {
         result = swapChain->GetBuffer(i, IID_PPV_ARGS(&swapChainBuffer[i]));
         if (FAILED(result))
-            throw GraphicsException(result, "Unable to retrieve buffer from swap chain.");
+            throw GfxException(result, "Unable to retrieve buffer from swap chain.");
     
         device->CreateRenderTargetView(
             swapChainBuffer[i].Get(), nullptr, rtvDescHeapHandle);
@@ -297,56 +312,17 @@ void Graphics::OnResize()
         rtvDescHeapHandle.ptr += rtvDescSize;
     }
 
-    D3D12_HEAP_PROPERTIES depthStencilHeapProperties;
-    depthStencilHeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-    depthStencilHeapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    depthStencilHeapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    depthStencilHeapProperties.CreationNodeMask = 1;
-    depthStencilHeapProperties.VisibleNodeMask = 1;
-    
-    D3D12_RESOURCE_DESC depthStencilTextureProperties;
-    depthStencilTextureProperties.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-    depthStencilTextureProperties.Alignment = 0;
-    depthStencilTextureProperties.Width = width;
-    depthStencilTextureProperties.Height = height;
-    depthStencilTextureProperties.DepthOrArraySize = 1;
-    depthStencilTextureProperties.MipLevels = 1;
-    depthStencilTextureProperties.Format = DXGI_FORMAT_R24G8_TYPELESS;
-    depthStencilTextureProperties.SampleDesc.Count = 1;
-    depthStencilTextureProperties.SampleDesc.Quality = 0;
-    depthStencilTextureProperties.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-    depthStencilTextureProperties.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-
-    D3D12_CLEAR_VALUE optClear;
-    optClear.Format = depthStencilFormat;
-    optClear.DepthStencil.Depth = 1.0f;
-    optClear.DepthStencil.Stencil = 0;
-
-    device->CreateCommittedResource(
-        &depthStencilHeapProperties,
-        D3D12_HEAP_FLAG_NONE,
-        &depthStencilTextureProperties,
-        D3D12_RESOURCE_STATE_COMMON,
-        &optClear,
-        IID_PPV_ARGS(depthStencilTexture.GetAddressOf()));
-
-    D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
-    dsvDesc.Format = depthStencilFormat;
-    dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-    dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
-    dsvDesc.Texture2D.MipSlice = 0;
-    device->CreateDepthStencilView(
-        depthStencilTexture.Get(), &dsvDesc, dsvHeap->GetCPUDescriptorHandleForHeapStart());
+    depthStencilTexture.Create(width, height);
 
     commandList->ResourceBarrier(
         1,
         &CD3DX12_RESOURCE_BARRIER::Transition(
-            depthStencilTexture.Get(),
+            depthStencilTexture.Resource(),
             D3D12_RESOURCE_STATE_COMMON,
             D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
     result = commandList->Close();
-    if (FAILED(result)) throw GraphicsException(result, "Failed to close commandList.");
+    if (FAILED(result)) throw GfxException(result, "Failed to close commandList.");
 
     ID3D12CommandList *commandLists[] = { commandList.Get() };
     commandQueue->ExecuteCommandLists(1, commandLists);
@@ -365,17 +341,17 @@ void Graphics::OnResize()
 }
 
 
-void Graphics::FlushCommandQueue()
+void Gfx::FlushCommandQueue()
 {
     currentFence++;
 
     auto result = commandQueue->Signal(fence.Get(), currentFence);
-    if (FAILED(result)) throw GraphicsException(result, "Failed to signal fence.");
+    if (FAILED(result)) throw GfxException(result, "Failed to signal fence.");
 
     if (fence->GetCompletedValue() < currentFence) {
         HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
         result = fence->SetEventOnCompletion(currentFence, eventHandle);
-        if (FAILED(result)) throw GraphicsException(result, "Failed setting completion event for fence blocking.");
+        if (FAILED(result)) throw GfxException(result, "Failed setting completion event for fence blocking.");
         WaitForSingleObject(eventHandle, INFINITE);
         CloseHandle(eventHandle);
     }
@@ -384,7 +360,7 @@ void Graphics::FlushCommandQueue()
 }
 
 
-void Graphics::LogAdapters()
+void Gfx::LogAdapters()
 {
     wstring log = L"";
 

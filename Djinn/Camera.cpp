@@ -1,11 +1,12 @@
 #include "Camera.h"
-#include "Graphics.h"
+#include "Gfx.h"
 
 using namespace Djinn;
+using namespace Djinn::Graphics;
 
 Camera::Camera()
 {
-    Graphics::Context();
+    Gfx::Context();
 }
 
 

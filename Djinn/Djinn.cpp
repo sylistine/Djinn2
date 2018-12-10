@@ -4,12 +4,13 @@
 #include "Djinn.h"
 
 #include "WindowsContainer.h"
-#include "Graphics.h"
+#include "Gfx.h"
 
 #include "Utilities.h"
 
 
 using namespace Djinn;
+using namespace Djinn::Graphics;
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cmdline, int cmdshow)
 {
@@ -19,14 +20,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cmdline, 
         WindowsContainer container(hInstance);
         container.Initialize();
 
-        Graphics::Context().Initialize(
+        Gfx::Context().Initialize(
             container.GetWindowHandler(),
             container.GetWindowWidth(), container.GetWindowHeight());
 
         while (!container.IsApplicationQuitting()) {
             container.Update();
             // Handle handle resize messages.
-            Graphics::Context().Update();
+            Gfx::Context().Update();
         }
     } catch (std::exception &e) {
         Logger::Write(Utilities::ANSI2UNICODE(e.what()).c_str());

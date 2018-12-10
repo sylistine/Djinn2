@@ -13,9 +13,12 @@
 #include "d3dx12.h"
 
 #include "Logger.h"
+#include "GfxException.h"
 
-namespace Djinn
-{   
+#include "DepthStencilResource.h"
+
+namespace Djinn::Graphics
+{
     typedef struct OutputInfo {
         DXGI_OUTPUT_DESC desc;
         std::vector<DXGI_MODE_DESC> modeDescs;
@@ -26,21 +29,21 @@ namespace Djinn
         std::vector<OutputInfo> outputs;
     } AdapterInfo;
 
-    class Graphics
+    class Gfx
     {
     public:
-        static Graphics& Context(){
-            static Graphics instance;
+        static Gfx& Context() {
+            static Gfx instance;
             return instance;
         }
-        ~Graphics();
-        Graphics(const Graphics&) = delete;
-        void operator=(const Graphics&) = delete;
+        ~Gfx();
+        Gfx(const Gfx&) = delete;
+        void operator=(const Gfx&) = delete;
         void Initialize(HWND outputWindow, int width, int height);
         void Update();
         void GetWindowSize(int& width, int& height);
     private:
-        Graphics() {};
+        Gfx();
 
         static const UINT swapChainBufferCount = 2;
         HWND outputWindow;
@@ -71,7 +74,7 @@ namespace Djinn
         Microsoft::WRL::ComPtr<IDXGISwapChain1> swapChain;
         Microsoft::WRL::ComPtr<ID3D12Resource> swapChainBuffer[swapChainBufferCount];
         UINT currentBackBuffer;
-        Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilTexture;
+        DepthStencilResource depthStencilTexture;
 
         D3D12_VIEWPORT screenViewport;
         D3D12_RECT scissorRect;
@@ -80,7 +83,6 @@ namespace Djinn
         DXGI_MODE_DESC preferredOutputMode;
 
         DXGI_FORMAT backBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-        DXGI_FORMAT depthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
         UINT msaaQualityLevels = 0;
 
         // Initialization.
@@ -99,26 +101,5 @@ namespace Djinn
         void FlushCommandQueue();
 
         void LogAdapters();
-    };
-
-    class GraphicsException : public std::exception
-    {
-    public:
-        GraphicsException() : GraphicsException(0, "") {}
-        GraphicsException(HRESULT hresult, char const* error) {
-            auto errcode = (D3D12Errors.find(hresult)) != D3D12Errors.end() ? D3D12Errors[hresult] : "Unspecified error.";
-            strcat_s(msg, 256, error);
-            strcat_s(msg, 256, " Error code: ");
-            strcat_s(msg, 256, errcode);
-        };
-        char const* what() const override {
-            return msg;
-        };
-    private:
-        char msg[256] = "DirectX12 encountered an exception: ";
-        //HRESULT translation
-        std::map<unsigned int, const char*> D3D12Errors = {
-            { 0x80070057, "E_INVALIDARG" }
-        };
     };
 }
