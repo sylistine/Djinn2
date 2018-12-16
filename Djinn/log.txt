@@ -2,7 +2,7 @@ Djinn Renderer v0.2
 
 Platform: Win32
 
-Graphics: DirectX12
+Initializing DirectX12.
 
 Preferred output mode found. 1920x1080
 
@@ -13,4 +13,3 @@ Adapter: Microsoft Basic Render Driver
 
 
 4x MSAA quality levels: 0
-

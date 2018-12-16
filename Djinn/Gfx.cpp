@@ -6,8 +6,9 @@ using namespace Microsoft::WRL;
 using namespace Djinn::Graphics;
 
 
-Gfx::Gfx() {
-    Logger::Write(L"Graphics: DirectX12");
+Gfx::Gfx()
+{
+    Logger::Write(L"Initializing DirectX12.");
 
 #if _DEBUG
     InitDebugLayer();
