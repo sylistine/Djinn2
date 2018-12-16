@@ -15,8 +15,6 @@ Gfx::Gfx() {
 
     CreateDxgiFactory();
     CreateDevice();
-
-    depthStencilTexture.Init(device, dsvHeap);
 }
 
 
@@ -27,9 +25,9 @@ Gfx::~Gfx()
 
 void Gfx::Initialize(HWND wnd, int width, int height)
 {
-    outputWindow = wnd;
-    width = width;
-    height = height;
+    m_outputWindow = wnd;
+    this->m_width = width;
+    this->m_height = height;
 
     UpdateAdapterInfo();
 #if _DEBUG
@@ -44,20 +42,54 @@ void Gfx::Initialize(HWND wnd, int width, int height)
 
     CreateDescriptorHeaps();
 
+    m_depthStencilTexture.Init(m_device);
+
     OnResize();
 }
 
 
 void Gfx::Update()
 {
+    // Reset command list junk.
+    auto result = m_commandAllocator->Reset();
+    if (FAILED(result)) throw GfxException(result, "Failed to reset command allocator.");
+    result = m_commandList->Reset(m_commandAllocator.Get(), nullptr);
+    if (FAILED(result)) throw GfxException(result, "Failed to reset command list.");
 
+    // Build command list.
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+        m_swapChainBuffer[m_currentBackBuffer].Get(),
+        D3D12_RESOURCE_STATE_PRESENT,
+        D3D12_RESOURCE_STATE_RENDER_TARGET
+    ));
+    D3D12_CPU_DESCRIPTOR_HANDLE viewHandle;
+    viewHandle.ptr = m_rtvHeap->GetCPUDescriptorHandleForHeapStart().ptr +
+        m_currentBackBuffer * m_rtvDescSize;
+    float clearColor[4] = { 0, 0, 0, 0 };
+    m_commandList->ClearRenderTargetView(viewHandle, clearColor, 0, nullptr);
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+        m_swapChainBuffer[m_currentBackBuffer].Get(),
+        D3D12_RESOURCE_STATE_RENDER_TARGET,
+        D3D12_RESOURCE_STATE_PRESENT
+    ));
+    m_commandList->Close();
+    
+    // Submit command list.
+    ID3D12CommandList **cmdListArray = new ID3D12CommandList*[1];
+    cmdListArray[0] = m_commandList.Get();
+    m_commandQueue->ExecuteCommandLists(1, cmdListArray);
+    result = m_swapChain->Present(0, 0);
+    if (FAILED(result)) throw GfxException(result, "Failed to present swap chain.");
+    m_currentBackBuffer = (m_currentBackBuffer + 1) % s_swapChainBufferCount;
+    FlushCommandQueue();
+    delete[] cmdListArray;
 }
 
 
 void Gfx::GetWindowSize(int& width, int& height)
 {
-    width = preferredOutputMode.Width;
-    height = preferredOutputMode.Height;
+    width = m_preferredOutputMode.Width;
+    height = m_preferredOutputMode.Height;
 }
 
 
@@ -72,21 +104,21 @@ inline void Gfx::InitDebugLayer()
 
 inline void Gfx::CreateDxgiFactory()
 {
-    auto result = CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory));
+    auto result = CreateDXGIFactory1(IID_PPV_ARGS(&m_dxgiFactory));
     if (FAILED(result)) throw GfxException(result, "Failed to create DXGIFactory");
 }
 
 
 inline void Gfx::CreateDevice()
 {
-    auto result = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device));
+    auto result = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device));
     if (FAILED(result))
     {
         ComPtr<IDXGIAdapter> warpAdapter;
-        result = dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter));
+        result = m_dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter));
         if (FAILED(result)) throw GfxException(result, "Failed to create default device and warp adapter.");
 
-        result = D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device));
+        result = D3D12CreateDevice(warpAdapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device));
         if (FAILED(result)) throw GfxException(result, "Unable to create any device.");
     }
 }
@@ -96,7 +128,7 @@ void Gfx::UpdateAdapterInfo()
 {
     UINT i = 0;
     IDXGIAdapter *current_adapter = nullptr;
-    while (dxgiFactory->EnumAdapters(i++, &current_adapter) != DXGI_ERROR_NOT_FOUND)
+    while (m_dxgiFactory->EnumAdapters(i++, &current_adapter) != DXGI_ERROR_NOT_FOUND)
     {
         AdapterInfo newAdapter;
         current_adapter->GetDesc(&newAdapter.desc);
@@ -106,25 +138,25 @@ void Gfx::UpdateAdapterInfo()
         while (current_adapter->EnumOutputs(j++, &current_output) != DXGI_ERROR_NOT_FOUND)
         {
             UINT modeCount = 0;
-            current_output->GetDisplayModeList(backBufferFormat, 0, &modeCount, nullptr);
+            current_output->GetDisplayModeList(m_backBufferFormat, 0, &modeCount, nullptr);
             auto modeList = new DXGI_MODE_DESC[modeCount];
-            current_output->GetDisplayModeList(backBufferFormat, 0, &modeCount, modeList);
+            current_output->GetDisplayModeList(m_backBufferFormat, 0, &modeCount, modeList);
 
             OutputInfo newOutput;
             current_output->GetDesc(&newOutput.desc);
             for (UINT k = 0U; k < modeCount; ++k)
             {
                 if (modeList[k].Width == 1920U && modeList[k].Height == 1080U) {
-                    if (preferredOutputMode.RefreshRate.Denominator == 0) {
-                        preferredOutputMode = modeList[k];
+                    if (m_preferredOutputMode.RefreshRate.Denominator == 0) {
+                        m_preferredOutputMode = modeList[k];
                     }
                     else {
                         auto& newRefresh = modeList[k].RefreshRate;
                         double newRate = newRefresh.Numerator / newRefresh.Denominator;
-                        auto& oldRefresh = preferredOutputMode.RefreshRate;
+                        auto& oldRefresh = m_preferredOutputMode.RefreshRate;
                         double oldRate = oldRefresh.Numerator / oldRefresh.Denominator;
                         if (newRate > oldRate) {
-                            preferredOutputMode = modeList[k];
+                            m_preferredOutputMode = modeList[k];
                         }
                     }
                 }
@@ -134,24 +166,24 @@ void Gfx::UpdateAdapterInfo()
             current_output->Release();
             current_output = nullptr;
         }
-        adapterInfo.push_back(newAdapter);
+        m_adapterInfo.push_back(newAdapter);
         current_adapter->Release();
         current_adapter = nullptr;
     }
 
-    if (preferredOutputMode.RefreshRate.Numerator == 0) {
+    if (m_preferredOutputMode.RefreshRate.Numerator == 0) {
         throw GfxException(0, "No supported output modes detected.");
     } else {
         Logger::Write(wstring(L"Preferred output mode found. ")
-            + to_wstring(preferredOutputMode.Width) + L"x"
-            + to_wstring(preferredOutputMode.Height));
+            + to_wstring(m_preferredOutputMode.Width) + L"x"
+            + to_wstring(m_preferredOutputMode.Height));
     }
 }
 
 
 inline void Gfx::CreateFence()
 {
-    auto result = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
+    auto result = m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence));
     if (FAILED(result)) throw GfxException(result, "Unable to create fence");
 }
 
@@ -159,16 +191,16 @@ inline void Gfx::CreateFence()
 inline void Gfx::CheckMSAASupport()
 {
     D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS msQualityLevels;
-    msQualityLevels.Format = backBufferFormat;
+    msQualityLevels.Format = m_backBufferFormat;
     msQualityLevels.SampleCount = 4;
     msQualityLevels.Flags = D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE;
     msQualityLevels.NumQualityLevels = 0;
-    auto result = device->CheckFeatureSupport(
+    auto result = m_device->CheckFeatureSupport(
         D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS,
         &msQualityLevels, sizeof msQualityLevels);
-    msaaQualityLevels = msQualityLevels.NumQualityLevels - 1;
+    m_msaaQualityLevels = msQualityLevels.NumQualityLevels - 1;
 
-    Logger::Write(L"4x MSAA quality levels: " + to_wstring(msaaQualityLevels));
+    Logger::Write(L"4x MSAA quality levels: " + to_wstring(m_msaaQualityLevels));
 }
 
 
@@ -180,42 +212,42 @@ inline void Gfx::CreateCommandObjects()
     queueDesc.Type = commandListType;
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 
-    auto result = device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue));
+    auto result = m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_commandQueue));
     if (FAILED(result)) throw GfxException(result, "Unable to create command queue.");
 
-    result = device->CreateCommandAllocator(
+    result = m_device->CreateCommandAllocator(
         commandListType,
-        IID_PPV_ARGS(commandAllocator.GetAddressOf()));
+        IID_PPV_ARGS(m_commandAllocator.GetAddressOf()));
     if (FAILED(result)) throw GfxException(result, "Unable to create command allocator.");
 
-    result = device->CreateCommandList(
+    result = m_device->CreateCommandList(
         0,
         commandListType,
-        commandAllocator.Get(),
+        m_commandAllocator.Get(),
         nullptr,
-        IID_PPV_ARGS(commandList.GetAddressOf()));
+        IID_PPV_ARGS(m_commandList.GetAddressOf()));
     if (FAILED(result)) throw GfxException(result, "Unable to create command list.");
 
-    commandList->Close();
+    m_commandList->Close();
 }
 
 
 inline void Gfx::CreateSwapChain()
 {
-    swapChain.Reset();
+    m_swapChain.Reset();
 
     DXGI_SAMPLE_DESC sampleDesc;
     sampleDesc.Count = 1;
     sampleDesc.Quality= 0;
 
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc;
-    swapChainDesc.Width = width;
-    swapChainDesc.Height = width;
-    swapChainDesc.Format = backBufferFormat;
+    swapChainDesc.Width = m_width;
+    swapChainDesc.Height = m_width;
+    swapChainDesc.Format = m_backBufferFormat;
     swapChainDesc.Stereo = false;
     swapChainDesc.SampleDesc = sampleDesc;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    swapChainDesc.BufferCount = swapChainBufferCount;
+    swapChainDesc.BufferCount = s_swapChainBufferCount;
     swapChainDesc.Scaling = DXGI_SCALING_NONE;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
@@ -228,13 +260,13 @@ inline void Gfx::CreateSwapChain()
     fullscreenDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
     fullscreenDesc.Windowed = false;
 
-    auto result = dxgiFactory->CreateSwapChainForHwnd(
-        commandQueue.Get(),
-        outputWindow,
+    auto result = m_dxgiFactory->CreateSwapChainForHwnd(
+        m_commandQueue.Get(),
+        m_outputWindow,
         &swapChainDesc,
         nullptr,
         nullptr,
-        swapChain.GetAddressOf());
+        m_swapChain.GetAddressOf());
 
     if (FAILED(result))
     {
@@ -249,30 +281,18 @@ inline void Gfx::CreateSwapChain()
 inline void Gfx::CreateDescriptorHeaps()
 {
     // RTV STUFF
-    rtvDescSize = device->GetDescriptorHandleIncrementSize(
+    m_rtvDescSize = m_device->GetDescriptorHandleIncrementSize(
         D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
     rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-    rtvHeapDesc.NumDescriptors = swapChainBufferCount;
+    rtvHeapDesc.NumDescriptors = s_swapChainBufferCount;
     rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
     rtvHeapDesc.NodeMask = 0;
-    device->CreateDescriptorHeap(
+    m_device->CreateDescriptorHeap(
         &rtvHeapDesc,
-        IID_PPV_ARGS(rtvHeap.GetAddressOf()));
+        IID_PPV_ARGS(m_rtvHeap.GetAddressOf()));
 
-    // DSV STUFF
-    dsvDescSize = device->GetDescriptorHandleIncrementSize(
-        D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
-    D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc;
-    dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-    dsvHeapDesc.NumDescriptors = 1;
-    dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-    dsvHeapDesc.NodeMask = 0;
-    device->CreateDescriptorHeap(
-        &dsvHeapDesc,
-        IID_PPV_ARGS(dsvHeap.GetAddressOf()));
-
-    cbvSrvUavDescSize = device->GetDescriptorHandleIncrementSize(
+    m_cbvSrvUavDescSize = m_device->GetDescriptorHandleIncrementSize(
         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
@@ -282,81 +302,81 @@ void Gfx::OnResize()
     FlushCommandQueue();
 
     // Command objects reset.
-    auto result = commandList->Reset(commandAllocator.Get(), nullptr);
+    auto result = m_commandList->Reset(m_commandAllocator.Get(), nullptr);
     if (FAILED(result)) throw GfxException(result, "Unable to reset command list.");
 
     // Final render resource reset.
-    for (auto& buffer : swapChainBuffer) {
+    for (auto& buffer : m_swapChainBuffer) {
         buffer.Reset();
     }
-    depthStencilTexture.Reset();
+    m_depthStencilTexture.Reset();
 
-    result = swapChain->ResizeBuffers(
-        swapChainBufferCount,
-        width, height,
-        backBufferFormat,
+    result = m_swapChain->ResizeBuffers(
+        s_swapChainBufferCount,
+        m_width, m_height,
+        m_backBufferFormat,
         DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH);
     if (FAILED(result)) throw GfxException(result, "Unable to resize swap chain buffers.");
 
-    currentBackBuffer = 0;
+    m_currentBackBuffer = 0;
 
-    auto rtvDescHeapHandle = rtvHeap->GetCPUDescriptorHandleForHeapStart();
-    for (auto i = 0U; i < swapChainBufferCount; ++i) {
-        result = swapChain->GetBuffer(i, IID_PPV_ARGS(&swapChainBuffer[i]));
+    auto rtvDescHeapHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
+    for (auto i = 0U; i < s_swapChainBufferCount; ++i) {
+        result = m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_swapChainBuffer[i]));
         if (FAILED(result))
             throw GfxException(result, "Unable to retrieve buffer from swap chain.");
     
-        device->CreateRenderTargetView(
-            swapChainBuffer[i].Get(), nullptr, rtvDescHeapHandle);
+        m_device->CreateRenderTargetView(
+            m_swapChainBuffer[i].Get(), nullptr, rtvDescHeapHandle);
     
-        rtvDescHeapHandle.ptr += rtvDescSize;
+        rtvDescHeapHandle.ptr += m_rtvDescSize;
     }
 
-    depthStencilTexture.Create(width, height);
+    m_depthStencilTexture.Create(m_width, m_height);
 
-    commandList->ResourceBarrier(
+    m_commandList->ResourceBarrier(
         1,
         &CD3DX12_RESOURCE_BARRIER::Transition(
-            depthStencilTexture.Resource(),
+            m_depthStencilTexture.Resource(),
             D3D12_RESOURCE_STATE_COMMON,
             D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
-    result = commandList->Close();
+    result = m_commandList->Close();
     if (FAILED(result)) throw GfxException(result, "Failed to close commandList.");
 
-    ID3D12CommandList *commandLists[] = { commandList.Get() };
-    commandQueue->ExecuteCommandLists(1, commandLists);
+    ID3D12CommandList *commandLists[] = { m_commandList.Get() };
+    m_commandQueue->ExecuteCommandLists(1, commandLists);
 
     FlushCommandQueue();
 
     // Update viewport and scissor rect.
-    screenViewport.TopLeftX = 0;
-    screenViewport.TopLeftY = 0;
-    screenViewport.Width = static_cast<float>(width);
-    screenViewport.Height = static_cast<float>(height);
-    screenViewport.MinDepth = 0.0f;
-    screenViewport.MaxDepth = 1.0f;
+    m_screenViewport.TopLeftX = 0;
+    m_screenViewport.TopLeftY = 0;
+    m_screenViewport.Width = static_cast<float>(m_width);
+    m_screenViewport.Height = static_cast<float>(m_height);
+    m_screenViewport.MinDepth = 0.0f;
+    m_screenViewport.MaxDepth = 1.0f;
 
-    scissorRect = { 0, 0, width, height };
+    m_scissorRect = { 0, 0, m_width, m_height };
 }
 
 
 void Gfx::FlushCommandQueue()
 {
-    currentFence++;
+    m_currentFence++;
 
-    auto result = commandQueue->Signal(fence.Get(), currentFence);
+    auto result = m_commandQueue->Signal(m_fence.Get(), m_currentFence);
     if (FAILED(result)) throw GfxException(result, "Failed to signal fence.");
 
-    if (fence->GetCompletedValue() < currentFence) {
+    if (m_fence->GetCompletedValue() < m_currentFence) {
         HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
-        result = fence->SetEventOnCompletion(currentFence, eventHandle);
+        result = m_fence->SetEventOnCompletion(m_currentFence, eventHandle);
         if (FAILED(result)) throw GfxException(result, "Failed setting completion event for fence blocking.");
         WaitForSingleObject(eventHandle, INFINITE);
         CloseHandle(eventHandle);
     }
 
-    commandLists.clear();
+    m_commandLists.clear();
 }
 
 
@@ -364,7 +384,7 @@ void Gfx::LogAdapters()
 {
     wstring log = L"";
 
-    for (auto& adapter : adapterInfo) {
+    for (auto& adapter : m_adapterInfo) {
         log += wstring(L"Adapter: ") + adapter.desc.Description;
         log += Logger::WNewLine();
         for (auto& output : adapter.outputs) {

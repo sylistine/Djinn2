@@ -14,18 +14,28 @@ DepthStencilResource::~DepthStencilResource()
 }
 
 
-void DepthStencilResource::Init(
-    ComPtr<ID3D12Device> device, ComPtr<ID3D12DescriptorHeap> heap)
+void DepthStencilResource::Init(ComPtr<ID3D12Device> device)
 {
-    this->device = device;
-    this->heap = heap;
-    initialized = true;
+    this->m_device = device;
+
+    m_viewSize = device->GetDescriptorHandleIncrementSize(
+        D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+    D3D12_DESCRIPTOR_HEAP_DESC heapDesc;
+    heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+    heapDesc.NumDescriptors = 1;
+    heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+    heapDesc.NodeMask = 0;
+    device->CreateDescriptorHeap(
+        &heapDesc,
+        IID_PPV_ARGS(m_viewHeap.GetAddressOf()));
+
+    m_initialized = true;
 }
 
 
 void DepthStencilResource::Create(UINT64 width, UINT64 height)
 {
-    if (!initialized) throw GfxException(0, "Depth Stencil Texture Not Initialized.");
+    if (!m_initialized) throw GfxException(0, "Depth Stencil Texture Not Initialized.");
 
     D3D12_HEAP_PROPERTIES heapProperties;
     heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -48,26 +58,26 @@ void DepthStencilResource::Create(UINT64 width, UINT64 height)
     resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
     D3D12_CLEAR_VALUE clearValue;
-    clearValue.Format = depthStencilFormat;
+    clearValue.Format = m_format;
     clearValue.DepthStencil.Depth = 1.0f;
     clearValue.DepthStencil.Stencil = 0;
 
-    auto result = device->CreateCommittedResource(
+    auto result = m_device->CreateCommittedResource(
         &heapProperties,
         D3D12_HEAP_FLAG_NONE,
         &resourceDesc,
         D3D12_RESOURCE_STATE_COMMON,
         &clearValue,
-        IID_PPV_ARGS(depthStencilTexture.GetAddressOf()));
+        IID_PPV_ARGS(m_texture.GetAddressOf()));
     if (FAILED(result)) throw GfxException(result, "Unable to create Depth Stencil Resource.");
 
-    D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
-    dsvDesc.Format = depthStencilFormat;
-    dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-    dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
-    dsvDesc.Texture2D.MipSlice = 0;
-    device->CreateDepthStencilView(
-        depthStencilTexture.Get(),
-        &dsvDesc,
-        heap->GetCPUDescriptorHandleForHeapStart());
+    D3D12_DEPTH_STENCIL_VIEW_DESC desc;
+    desc.Format = m_format;
+    desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+    desc.Flags = D3D12_DSV_FLAG_NONE;
+    desc.Texture2D.MipSlice = 0;
+    m_device->CreateDepthStencilView(
+        m_texture.Get(),
+        &desc,
+        m_viewHeap->GetCPUDescriptorHandleForHeapStart());
 }

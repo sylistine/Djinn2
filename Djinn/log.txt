@@ -14,5 +14,3 @@ Adapter: Microsoft Basic Render Driver
 
 4x MSAA quality levels: 0
 
-DirectX12 encountered an exception: Unable to create Depth Stencil Resource. Error code: E_INVALIDARG
-
